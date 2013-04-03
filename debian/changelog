@@ -1,0 +1,5 @@
+naviserver-nsssl (0.2-1) unstable; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Wed, 03 Apr 2013 15:24:18 +0100
