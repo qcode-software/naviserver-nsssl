@@ -1,0 +1,20 @@
+From: David Osborne <david@qcode.co.uk>
+Date: Wed, 3 Apr 2013 16:03:22 +0100
+Subject: [PATCH] Change lib path
+
+---
+ Makefile |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 7da0b16..3a614ea 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,5 @@
+ ifndef NAVISERVER
+-    NAVISERVER  = /usr/local/ns
++    NAVISERVER  = /usr/lib/naviserver
+ endif
+ 
+ #
+-- 

@@ -10,7 +10,7 @@ Homepage: https://bitbucket.org/naviserver/nsssl
 
 Package: naviserver-nsssl
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, naviserver-dev
 Description: NaviServer SSL module
  This is NaviServer module that implements HTTP over SSL support and
  adds new ns_ssl command.
