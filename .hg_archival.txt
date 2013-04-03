@@ -1,0 +1,5 @@
+repo: bf1567892d8211b7cd6d79739f34be64f8a6443e
+node: 60b45c18e32315c7e90528a77cb0f513b18ada70
+branch: default
+latesttag: nsssl-0.1
+latesttagdistance: 12
