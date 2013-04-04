@@ -2,7 +2,7 @@ Source: naviserver-nsssl
 Section: web
 Priority: extra
 Maintainer: Qcode Software Ltd <hackers@qcode.co.uk>
-Build-Depends: debhelper (>= 7.0.50~),naviserver-dev
+Build-Depends: debhelper (>= 7.0.50~),naviserver-dev,libssl-dev
 Standards-Version: 3.8.4
 Homepage: https://bitbucket.org/naviserver/nsssl
 #Vcs-Git: git://git.debian.org/collab-maint/naviserver-nsssl.git
