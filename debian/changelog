@@ -1,3 +1,9 @@
+naviserver-nsssl (4.99.5-2) squeeze; urgency=low
+
+  * Switch distribution to squeeze
+
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Wed, 29 May 2013 09:25:08 +0100
+
 naviserver-nsssl (4.99.5-1) unstable; urgency=low
 
   * New upstream release

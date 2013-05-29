@@ -1,6 +1,6 @@
 Source: naviserver-nsssl
 Section: web
-Priority: extra
+Priority: optional
 Maintainer: Qcode Software Ltd <hackers@qcode.co.uk>
 Build-Depends: debhelper (>= 7.0.50~),naviserver-dev (>= 4.99.5),libssl-dev
 Standards-Version: 3.9.1
