@@ -14,7 +14,7 @@ if [ "$1" = "configure" ]; then
 		if ! HOSTNAME="$(hostname -f)" ; then
 			HOSTNAME="$(hostname)"
 		fi
-		cat <<EOF >$TEMPFILE
+		cat <<EOF >$TMPFILE
 #
 # Naviserver SSL default cert configuration file.
 #
@@ -36,6 +36,8 @@ EOF
 		if ! openssl req -config $TMPFILE -new -x509 -days 3650 -nodes -out $SSL_CERT -keyout $SSL_CERT > $TMPOUT 2>&1 ; then
 			echo "Could not create certificate. Openssl output was:" >&2
 			cat $TMPOUT >&2
+			# Cleanup, since key may have been written to $SSL_CERT before failure. Don't care if it fails.
+			rm -f $SSL_CERT || true
 			exit 1
     		fi
     	fi
