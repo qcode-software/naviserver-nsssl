@@ -1,3 +1,9 @@
+naviserver-nsssl (4.99.5-3) squeeze; urgency=low
+
+  * Add ssl-cert as pre req. Generate self-signed cert on install.
+
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Thu, 30 May 2013 13:10:18 +0100
+
 naviserver-nsssl (4.99.5-2) squeeze; urgency=low
 
   * Switch distribution to squeeze
