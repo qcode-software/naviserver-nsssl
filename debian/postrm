@@ -1,10 +1,13 @@
 #!/bin/sh -e
 
+SSL_CERT=/etc/naviserver/default.pem
+
 case "$1" in
     purge)
 	# Remove default certificate if in existence
-    	if [ -f /etc/naviserver/default.pem ]; then
-         	rm -f /etc/naviserver/default.pem
+    	if [ -f $SSL_CERT ]; then
+		# Delete certificate
+         	rm -f $SSL_CERT
     	fi
 
 	;;

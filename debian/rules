@@ -12,6 +12,7 @@
 override_dh_auto_install:
 	$(MAKE) build
 	dh_install
+	cp debian/naviserver.cnf debian/naviserver-nsssl/etc/naviserver
 
 %:
 	dh $@ 
