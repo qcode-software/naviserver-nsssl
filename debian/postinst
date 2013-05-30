@@ -5,8 +5,8 @@ set -e
 if [ "$1" = "configure" ]; then
 
 	# Create default certificate
-    	if [ ! -f /etc/naviserver/default.pem ]; then
-        	/usr/sbin/make-ssl-cert /usr/share/ssl-cert/ssleay.cnf /etc/naviserver/default.pem
+    	if [ ! -f /etc/naviserver/default.pem ] then
+        	make-ssl-cert /usr/share/ssl-cert/ssleay.cnf /etc/naviserver/default.pem
     	fi
 fi
 
