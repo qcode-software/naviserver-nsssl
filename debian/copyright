@@ -4,14 +4,17 @@ This work was packaged for Debian by:
 
 It was downloaded from:
 
-    https://bitbucket.org/naviserver/nsssl
+    https://bitbucket.org/naviserver/naviserver
 
-Upstream Author(s):
+Upstream Authors: 
 
     Vlad Seryakov vlad@crystalballinc.com
     Gustaf Neumann neumann@wu-wien.ac.at
 
-License:
+    Naviserver Team
+    https://www.ohloh.net/p/naviserver/contributors
+
+Copyright:
 
 MOZILLA PUBLIC LICENSE
 Version 1.1
@@ -522,6 +525,6 @@ replace them with the notice and other provisions required by the GPL.
 If you do not delete the provisions above, a recipient may use your
 version of this file under either the License or the GPL.
 
-Note: The various versions of the GPL can be found in
-/usr/share/common-licenses/
+
+[ The various versions of GPL can be found in /usr/share/common-licenses/ ]
 
