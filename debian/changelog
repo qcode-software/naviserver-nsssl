@@ -1,3 +1,9 @@
+naviserver-nsssl (4.99.6~20131003-1) squeeze; urgency=low
+
+  * New import from upstream
+
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Thu, 03 Oct 2013 15:20:09 +0100
+
 naviserver-nsssl (4.99.5-3) squeeze; urgency=low
 
   * Add ssl-cert as pre req. Generate self-signed cert on install.
