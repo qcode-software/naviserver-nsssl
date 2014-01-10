@@ -3,7 +3,7 @@ Section: web
 Priority: optional
 Maintainer: Qcode Software Ltd <hackers@qcode.co.uk>
 Build-Depends: debhelper (>= 7.0.50~),naviserver-dev (>= 4.99.5),libssl-dev
-Standards-Version: 3.9.1
+Standards-Version: 3.9.4
 Homepage: https://bitbucket.org/naviserver/nsssl
 #Vcs-Git: git://git.debian.org/collab-maint/naviserver-nsssl.git
 #Vcs-Browser: http://git.debian.org/?p=collab-maint/naviserver-nsssl.git;a=summary
