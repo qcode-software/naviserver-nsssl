@@ -1,4 +1,4 @@
-naviserver-nsssl (4.99.6~20130822) wheezy; urgency=low
+naviserver-nsssl (4.99.6~20130822-1) wheezy; urgency=low
 
   * Switch to wheezy. Import upstream as of 20130822.
 
