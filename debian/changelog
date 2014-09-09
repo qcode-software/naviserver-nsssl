@@ -1,3 +1,9 @@
+naviserver-nsssl (4.99.7~20140909-1) wheezy; urgency=low
+
+  * Import from upstream
+
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Tue, 09 Sep 2014 10:29:19 +0100
+
 naviserver-nsssl (4.99.6~20130822-1) wheezy; urgency=low
 
   * Switch to wheezy. Import upstream as of 20130822.
