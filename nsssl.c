@@ -40,7 +40,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#define NSSSL_VERSION  "0.5"
+#define NSSSL_VERSION  "0.6"
 
 typedef struct {
     SSL_CTX     *ctx;
@@ -73,7 +73,7 @@ static Ns_DriverSendProc Send;
 static Ns_DriverKeepProc Keep;
 static Ns_DriverCloseProc Close;
 
-static int SSLInterpInit(Tcl_Interp *interp, void *arg);
+static int SSLInterpInit(Tcl_Interp *interp, const void *arg);
 static int SSLObjCmd(ClientData arg, Tcl_Interp *interp,int objc,Tcl_Obj *CONST objv[]);
 static int SSLPassword(char *buf, int num, int rwflag, void *userdata);
 static void SSLLock(int mode, int n, const char *file, int line);
@@ -133,7 +133,7 @@ SSL_dhCB(SSL *ssl, int isExport, int keyLength) {
     default:
         key = drvPtr->dhKey1024;
     }
-    Ns_Log(Debug, "SSL_dhCB: returns %p\n", key);
+    Ns_Log(Debug, "SSL_dhCB: returns %p\n", (void *)key);
     return key;
 }
 
@@ -141,8 +141,8 @@ NS_EXPORT int
 Ns_ModuleInit(char *server, char *module)
 {
     Ns_DString ds;
-    int num, n;
-    char *path, *value;
+    int num;
+    const char *path, *value;
     SSLDriver *drvPtr;
     Ns_DriverInitData init = {0};
 
@@ -166,7 +166,7 @@ Ns_ModuleInit(char *server, char *module)
     init.closeProc = Close;
     init.opts = NS_DRIVER_SSL|NS_DRIVER_ASYNC;
     init.arg = drvPtr;
-    init.path = (char*)path;
+    init.path = path;
 
     if (Ns_DriverInit(server, module, &init) != NS_OK) {
         Ns_Log(Error, "nsssl: driver init failed.");
@@ -176,10 +176,12 @@ Ns_ModuleInit(char *server, char *module)
 
     num = CRYPTO_num_locks();
     driver_locks = ns_calloc(num, sizeof(*driver_locks));
-    for (n = 0; n < num; n++) {
-        Ns_DStringPrintf(&ds, "nsssl:%d", n);
-        Ns_MutexSetName(driver_locks + n, ds.string);
-        Ns_DStringTrunc(&ds, 0);
+    {   int n;
+        for (n = 0; n < num; n++) {
+            Ns_DStringPrintf(&ds, "nsssl:%d", n);
+            Ns_MutexSetName(driver_locks + n, ds.string);
+            Ns_DStringTrunc(&ds, 0);
+        }
     }
     CRYPTO_set_locking_callback(SSLLock);
     CRYPTO_set_id_callback(SSLThreadId);
@@ -263,23 +265,25 @@ Ns_ModuleInit(char *server, char *module)
     /*
      * Parse SSL protocols
      */
-    n = SSL_OP_ALL;
-    value = Ns_ConfigGetValue(path, "protocols");
-    if (value != NULL) {
-      if (strstr(value, "!SSLv2") != NULL) {
-          n |= SSL_OP_NO_SSLv2;
-          Ns_Log(Notice, "nsssl: disabling SSLv2");
-      }
-      if (strstr(value, "!SSLv3") != NULL) {
-          n |= SSL_OP_NO_SSLv3;
-          Ns_Log(Notice, "nsssl: disabling SSLv3");
-      }
-      if (strstr(value, "!TLSv1") != NULL) {
-          n |= SSL_OP_NO_TLSv1;
-          Ns_Log(Notice, "nsssl: disabling TLSv1");
-      }
+    {
+        long n = SSL_OP_ALL;
+        value = Ns_ConfigGetValue(path, "protocols");
+        if (value != NULL) {
+            if (strstr(value, "!SSLv2") != NULL) {
+                n |= SSL_OP_NO_SSLv2;
+                Ns_Log(Notice, "nsssl: disabling SSLv2");
+            }
+            if (strstr(value, "!SSLv3") != NULL) {
+                n |= SSL_OP_NO_SSLv3;
+                Ns_Log(Notice, "nsssl: disabling SSLv3");
+            }
+            if (strstr(value, "!TLSv1") != NULL) {
+                n |= SSL_OP_NO_TLSv1;
+                Ns_Log(Notice, "nsssl: disabling TLSv1");
+            }
+        }
+        SSL_CTX_set_options(drvPtr->ctx, n);
     }
-    SSL_CTX_set_options(drvPtr->ctx, n);
 
     /*
      * Set info callback to prevent client-initiated renegotiation
@@ -327,6 +331,7 @@ Ns_ModuleInit(char *server, char *module)
      */
     Ns_DStringSetLength(&ds, 1024);
     for (num = 0; !RAND_status() && num < 3; num++) {
+        int n;
         Ns_Log(Notice, "nsssl: Seeding OpenSSL's PRNG");
         for (n = 0; n < 1024; n++) {
             ds.string[n] = Ns_DRand();
@@ -353,7 +358,7 @@ Ns_ModuleInit(char *server, char *module)
  *      Open a listening socket in non-blocking mode.
  *
  * Results:
- *      The open socket or INVALID_SOCKET on error.
+ *      The open socket or NS_INVALID_SOCKET on error.
  *
  * Side effects:
  *      None
@@ -367,7 +372,7 @@ Listen(Ns_Driver *driver, CONST char *address, int port, int backlog)
     SOCKET sock;
 
     sock = Ns_SockListenEx((char*)address, port, backlog);
-    if (sock != INVALID_SOCKET) {
+    if (sock != NS_INVALID_SOCKET) {
 	SSLDriver *cfg = driver->arg;
 
         (void) Ns_SockSetNonBlocking(sock);
@@ -396,13 +401,13 @@ Listen(Ns_Driver *driver, CONST char *address, int port, int backlog)
  */
  
 static NS_DRIVER_ACCEPT_STATUS
-Accept(Ns_Sock *sock, SOCKET listensock, struct sockaddr *sockaddrPtr, int *socklenPtr)
+Accept(Ns_Sock *sock, SOCKET listensock, struct sockaddr *sockaddrPtr, socklen_t *socklenPtr)
 {
     SSLDriver *drvPtr = sock->driver->arg;
     SSLContext *sslPtr = sock->arg;
 
     sock->sock = Ns_SockAccept(listensock, sockaddrPtr, socklenPtr);
-    if (sock->sock != INVALID_SOCKET) {
+    if (sock->sock != NS_INVALID_SOCKET) {
 #ifdef __APPLE__
       /* 
        * Darwin's poll returns per default writable in situations,
@@ -455,7 +460,7 @@ Accept(Ns_Sock *sock, SOCKET listensock, struct sockaddr *sockaddrPtr, int *sock
  */
 
 static ssize_t
-Recv(Ns_Sock *sock, struct iovec *bufs, int nbufs, Ns_Time *timeoutPtr, int flags)
+Recv(Ns_Sock *sock, struct iovec *bufs, int nbufs, Ns_Time *timeoutPtr, unsigned int flags)
 {
     SSLDriver *drvPtr = sock->driver->arg;
     SSLContext *sslPtr = sock->arg;
@@ -537,7 +542,8 @@ Recv(Ns_Sock *sock, struct iovec *bufs, int nbufs, Ns_Time *timeoutPtr, int flag
  */
 
 static ssize_t
-Send(Ns_Sock *sock, struct iovec *bufs, int nbufs, Ns_Time *timeoutPtr, int flags)
+Send(Ns_Sock *sock, const struct iovec *bufs, int nbufs, 
+     const Ns_Time *timeoutPtr, unsigned int flags)
 {
     SSLContext *sslPtr = sock->arg;
     int rc, size, decork;
@@ -591,7 +597,7 @@ Send(Ns_Sock *sock, struct iovec *bufs, int nbufs, Ns_Time *timeoutPtr, int flag
  *----------------------------------------------------------------------
  */
 
-static int
+static bool
 Keep(Ns_Sock *sock)
 {
     SSLContext *sslPtr = sock->arg;
@@ -599,10 +605,10 @@ Keep(Ns_Sock *sock)
     if (SSL_get_shutdown(sslPtr->ssl) == 0) {
         BIO *bio = SSL_get_wbio(sslPtr->ssl);
         if (bio != NULL && BIO_flush(bio) == 1) {
-            return 1;
+            return NS_TRUE;
         }
     }
-    return 0;
+    return NS_FALSE;
 }
 
 
@@ -657,9 +663,9 @@ Close(Ns_Sock *sock)
  */
 
 static int
-SSLInterpInit(Tcl_Interp *interp, void *arg)
+SSLInterpInit(Tcl_Interp *interp, const void *arg)
 {
-    Tcl_CreateObjCommand(interp, "ns_ssl", SSLObjCmd, arg, NULL);
+    Tcl_CreateObjCommand(interp, "ns_ssl", SSLObjCmd, (ClientData)arg, NULL);
     return NS_OK;
 }
 
@@ -667,7 +673,7 @@ static int
 SSLPassword(char *buf, int num, int rwflag, void *userdata)
 {
     fprintf(stdout, "Enter SSL password:");
-    fgets(buf, num, stdin);
+    (void) fgets(buf, num, stdin);
     return(strlen(buf));
 }
 
@@ -883,9 +889,9 @@ SSLObjCmd(ClientData arg, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	}
 	Ns_HttpCheckSpool(httpPtr);
 
-	Ns_Log(Notice, "SSL request finished %d <%s>", httpPtr->status, httpPtr->replyHeaders->name);
+	Ns_Log(Ns_LogTaskDebug, "SSL request finished %d <%s>", httpPtr->status, httpPtr->replyHeaders->name);
 	if (httpPtr->status == 0) {
-	    Ns_Log(Notice, "======= SSL response <%s>", httpPtr->ds.string);
+	    Ns_Log(Ns_LogTaskDebug, "======= SSL response <%s>", httpPtr->ds.string);
 	}
 
         if (statusVarPtr != NULL && !Ns_SetNamedVar(interp, statusVarPtr, Tcl_NewIntObj(httpPtr->status))) {
@@ -1023,48 +1029,45 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
     NS_SOCKET    sock;
     Ns_HttpTask *httpPtr = NULL;
     Https       *httpsPtr = NULL;
-    int          len, portNr, uaFlag = -1;
-    char        *host, *file, *port, *body;
-    char         hostBuffer[256];
+    int          portNr, uaFlag = -1;
+    char        *url2, *host, *file, *portString;
     
     /*
      * Parse and split url
      */
     
-    if (strncmp(url, "https://", 8) != 0 || url[8] == '\0') {
+    if (strncmp(url, "https://", 8u) != 0 || url[8] == '\0') {
 	Tcl_AppendResult(interp, "invalid url: ", url, NULL);
 	return TCL_ERROR;
     }
-    host = url + 8;
+        /*
+     * Make a non-const copy of url, where we can replace the item separating
+     * characters with '\0' characters.
+     */
+    url2 = ns_strdup(url);
+    
+    host = url2 + 8;
     file = strchr(host, '/');
-    // Ns_Log(Notice, "XXX search host <%s> for slash => file <%s>", host, file);
     if (file != NULL) {
 	*file = '\0';
     }
-    //Ns_Log(Notice, "XXX remaining host <%s>", host);
-    port = strchr(host, ':');
-    if (port == NULL) {
-	portNr = 443;
-    } else {
-	*port = '\0';
-	portNr = (int) strtol(port+1, NULL, 10);
-    }
 
-    //Ns_Log(Notice, "XXX url <%s> port %d host <%s> file <%s>", url, portNr, host, file);
-    strncpy(hostBuffer, host, sizeof(hostBuffer));
+    portString = strchr(host, ':');
+    if (portString != NULL) {
+	portNr = (int) strtol(portString + 1, NULL, 10);
+    } else {
+        portNr = 443;
+    }
     
     /*
      * Connect to the host and allocate session struct
      */
 
-    sock = Ns_SockAsyncConnect(hostBuffer, portNr);
-    if (sock == INVALID_SOCKET) {
+    sock = Ns_SockAsyncConnect(host, portNr);
+    if (sock == NS_INVALID_SOCKET) {
 	Tcl_AppendResult(interp, "connect to ", url, " failed: ", ns_sockstrerror(ns_sockerrno), NULL);
+        ns_free(url2);
 	return TCL_ERROR;
-    }
-
-    if (file != NULL) {
-	*file = '/';
     }
 
     httpsPtr = ns_calloc(1, sizeof(Https));
@@ -1072,12 +1075,12 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 
     httpPtr->sock            = sock;
     httpPtr->spoolLimit      = -1;
-    httpPtr->url             = ns_strdup(url);
+    httpPtr->url             = url2;
     Ns_MutexInit(&httpPtr->lock);
     /*Ns_MutexSetName(&httpPtr->lock, name, buffer);*/
     Tcl_DStringInit(&httpPtr->ds);
 
-    //Ns_Log(Notice, "url <%s> port %d sock %d host <%s> file <%s>", httpPtr->url, portNr, sock, hostBuffer, file);
+    //Ns_Log(Ns_LogTaskDebug, "url <%s> port %d sock %d host <%s> file <%s>", httpPtr->url, portNr, sock, hostBuffer, file);
 
     /*
      * Now initialize OpenSSL context
@@ -1141,7 +1144,7 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 	return TCL_ERROR;
     }
     
-    Ns_DStringPrintf(&httpPtr->ds, "%s %s HTTP/1.0\r\n", method, file ? file : "/");
+    Ns_DStringPrintf(&httpPtr->ds, "%s /%s HTTP/1.0\r\n", method, (file != NULL) ? file : "");
 
     /*
      * Submit provided headers
@@ -1180,30 +1183,36 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 			 Ns_InfoServerVersion());
     }
     
-    if (port == NULL) {
-	Ns_DStringPrintf(&httpPtr->ds, "Host: %s\r\n", hostBuffer);
+    if (portString == NULL) {
+	Ns_DStringPrintf(&httpPtr->ds, "Host: %s\r\n", host);
     } else {
-	Ns_DStringPrintf(&httpPtr->ds, "Host: %s:%d\r\n", hostBuffer, portNr);
+	Ns_DStringPrintf(&httpPtr->ds, "Host: %s:%d\r\n", host, portNr);
     }
 
-    body = NULL;
     if (bodyPtr != NULL) {
-	body = Tcl_GetStringFromObj(bodyPtr, &len);
-	if (len == 0) {
-	    body = NULL;
-	}
+        int len = 0;
+	const char *body = Tcl_GetStringFromObj(bodyPtr, &len);
+	Ns_DStringPrintf(&httpPtr->ds, "Content-Length: %d\r\n\r\n", len);
+        Tcl_DStringAppend(&httpPtr->ds, body, len);
+    } else {
+        Tcl_DStringAppend(&httpPtr->ds, "\r\n", 2);
     }
-    if (body != NULL) {
-	Ns_DStringPrintf(&httpPtr->ds, "Content-Length: %d\r\n", len);
-    }
-    Tcl_DStringAppend(&httpPtr->ds, "\r\n", 2);
-    if (body != NULL) {
-	Tcl_DStringAppend(&httpPtr->ds, body, len);
-    }
+        
     httpPtr->next = httpPtr->ds.string;
     httpPtr->len = httpPtr->ds.length;
 
-    /*Ns_Log(Notice, "final request <%s>", httpPtr->ds.string);*/
+    /*
+     *  Restore the url2 string. This modifies the string appearance of host
+     *  as well.
+     */
+    if (file != NULL) {
+	*file = '/';
+    }
+    if (portString != NULL) {
+	*portString = ':';
+    }
+    
+    Ns_Log(Ns_LogTaskDebug, "final request <%s>", httpPtr->ds.string);
     
     *httpsPtrPtr = httpsPtr;
     return TCL_OK;
@@ -1244,7 +1253,7 @@ HttpsClose(Https *httpsPtr)
     }
     Ns_MutexDestroy(&httpPtr->lock);
     Tcl_DStringFree(&httpPtr->ds);
-    ns_free(httpPtr->url);
+    ns_free((char *)httpPtr->url);
     ns_free(httpsPtr);
 }
 
@@ -1285,7 +1294,7 @@ HttpsAbort(Https *httpsPtr)
  */
 
 static void
-HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
+HttpsProc(Ns_Task *task, SOCKET sock, void *arg, Ns_SockState why)
 {
     Https       *httpsPtr = arg;
     Ns_HttpTask *httpPtr  = &httpsPtr->http;
@@ -1318,7 +1327,7 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
             if (httpPtr->len == 0) {
 		SSL_set_shutdown(httpsPtr->ssl, SSL_SENT_SHUTDOWN);
                 /*shutdown(sock, 1);*/
-		/*Ns_Log(Notice, "SSL WRITE done, switch to READ");*/
+		/*Ns_Log(Ns_LogTaskDebug, "SSL WRITE done, switch to READ");*/
                 Tcl_DStringTrunc(&httpPtr->ds, 0);
                 Ns_TaskCallback(task, NS_SOCK_READ, &httpPtr->timeout);
             }
@@ -1350,7 +1359,7 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
         }
 	n = got;
 
-	/*Ns_Log(Notice, "Task READ got %d bytes err %d", (int)n, err);*/
+	/*Ns_Log(Ns_LogTaskDebug, "Task READ got %d bytes err %d", (int)n, err);*/
 	
         if (likely(n > 0)) {
 	    /* 
@@ -1362,7 +1371,7 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
 	    if (httpPtr->spoolFd > 0) {
 		Ns_HttpAppendBuffer(httpPtr, buf, n);
 	    } else {
-		Ns_Log(Notice, "Task got %d bytes", (int)n);
+		Ns_Log(Ns_LogTaskDebug, "Task got %d bytes", (int)n);
 		Ns_HttpAppendBuffer(httpPtr, buf, n);
 
 		if (unlikely(httpPtr->replyHeaderSize == 0)) {
@@ -1372,7 +1381,7 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
 		 * Ns_HttpCheckSpool might set httpPtr->spoolFd
 		 */
 		Ns_HttpCheckSpool(httpPtr);
-		/*Ns_Log(Notice, "Task got %d bytes, header = %d", (int)n, httpPtr->replyHeaderSize);*/
+		/*Ns_Log(Ns_LogTaskDebug, "Task got %d bytes, header = %d", (int)n, httpPtr->replyHeaderSize);*/
 	    }
             return;
         }
@@ -1395,6 +1404,10 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
     case NS_SOCK_CANCEL:
         httpPtr->error = "cancelled";
         break;
+
+    case NS_SOCK_EXCEPTION:
+	httpPtr->error = "exception";
+	break;
     }
 
     /*
@@ -1405,3 +1418,11 @@ HttpsProc(Ns_Task *task, SOCKET sock, void *arg, int why)
     Ns_TaskDone(httpPtr->task);
 }
 
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * indent-tabs-mode: nil
+ * End:
+ */
