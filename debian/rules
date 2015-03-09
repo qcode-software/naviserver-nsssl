@@ -10,7 +10,7 @@
 #export DH_VERBOSE=1
 
 override_dh_auto_build:
-	$(MAKE) build NAVISERVER=/usr/lib/naviserver/
+	$(MAKE) build NAVISERVER=/usr/lib/naviserver
 
 %:
 	dh $@ 
