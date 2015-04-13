@@ -40,7 +40,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#define NSSSL_VERSION  "0.6"
+#define NSSSL_VERSION  "0.8"
 
 typedef struct {
     SSL_CTX     *ctx;
@@ -209,7 +209,7 @@ Ns_ModuleInit(char *server, char *module)
      */
     value = Ns_ConfigGetValue(path, "certificate");
     if (value == NULL) {
-        Ns_Log(Error, "nsssl: certificate parameter should be specified under %s",path);
+        Ns_Log(Error, "nsssl: certificate parameter should be specified under %s", path);
         return NS_ERROR;
     }
     if (SSL_CTX_use_certificate_chain_file(drvPtr->ctx, value) != 1) {
@@ -546,10 +546,11 @@ Send(Ns_Sock *sock, const struct iovec *bufs, int nbufs,
      const Ns_Time *timeoutPtr, unsigned int flags)
 {
     SSLContext *sslPtr = sock->arg;
-    int rc, size, decork;
+    int         rc, size;
+    bool        decork;
 
     size = 0;
-    decork = Ns_SockCork(sock, 1);
+    decork = Ns_SockCork(sock, NS_TRUE);
     while (nbufs > 0) {
 	if (bufs->iov_len > 0) {
 	    ERR_clear_error();
@@ -562,7 +563,9 @@ Send(Ns_Sock *sock, const struct iovec *bufs, int nbufs,
 			continue;
 		    }
 		}
-		if (decork) {Ns_SockCork(sock, 0);}
+		if (decork == NS_TRUE) {
+                    Ns_SockCork(sock, NS_FALSE);
+                }
 		SSL_set_shutdown(sslPtr->ssl, SSL_RECEIVED_SHUTDOWN);
 		return -1;
 	    }
@@ -576,7 +579,9 @@ Send(Ns_Sock *sock, const struct iovec *bufs, int nbufs,
 	bufs++;
     }
 
-    if (decork) {Ns_SockCork(sock, 0);}
+    if (decork == NS_TRUE) {
+        Ns_SockCork(sock, NS_FALSE);
+    }
     return size;
 }
 
@@ -1040,7 +1045,7 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 	Tcl_AppendResult(interp, "invalid url: ", url, NULL);
 	return TCL_ERROR;
     }
-        /*
+    /*
      * Make a non-const copy of url, where we can replace the item separating
      * characters with '\0' characters.
      */
@@ -1054,6 +1059,7 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 
     portString = strchr(host, ':');
     if (portString != NULL) {
+        *portString = '\0';
 	portNr = (int) strtol(portString + 1, NULL, 10);
     } else {
         portNr = 443;
@@ -1076,11 +1082,12 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
     httpPtr->sock            = sock;
     httpPtr->spoolLimit      = -1;
     httpPtr->url             = url2;
+
     Ns_MutexInit(&httpPtr->lock);
     /*Ns_MutexSetName(&httpPtr->lock, name, buffer);*/
     Tcl_DStringInit(&httpPtr->ds);
 
-    //Ns_Log(Ns_LogTaskDebug, "url <%s> port %d sock %d host <%s> file <%s>", httpPtr->url, portNr, sock, hostBuffer, file);
+    /*Ns_Log(Ns_LogTaskDebug, "url <%s> port %d sock %d host <%s> file <%s>", httpPtr->url, portNr, sock, host, file);*/
 
     /*
      * Now initialize OpenSSL context
@@ -1144,7 +1151,7 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 	return TCL_ERROR;
     }
     
-    Ns_DStringPrintf(&httpPtr->ds, "%s /%s HTTP/1.0\r\n", method, (file != NULL) ? file : "");
+    Ns_DStringPrintf(&httpPtr->ds, "%s /%s HTTP/1.0\r\n", method, (file != NULL) ? file + 1 : "");
 
     /*
      * Submit provided headers
