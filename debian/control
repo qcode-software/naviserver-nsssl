@@ -19,6 +19,6 @@ Package: naviserver-nsssl-dbg
 Section: debug
 Priority: extra
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, naviserver (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, naviserver-nsssl (= ${binary:Version})
 Description: Naviserver Nsssl debugging symbols
  This package includes the debugging symbols for Naviserver-nsssl
