@@ -12,5 +12,8 @@
 override_dh_auto_build:
 	$(MAKE) build NAVISERVER=/usr/lib/naviserver
 
+override_dh_strip:
+	dh_strip --dbg-package=naviserver-nsssl-dbg
+
 %:
 	dh $@ 

@@ -14,3 +14,11 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, naviserver (>= 4.99.7), openssl
 Description: NaviServer SSL module
  This is NaviServer module that implements HTTP over SSL support and
  adds new ns_ssl command.
+
+Package: naviserver-nsssl-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, naviserver (= ${binary:Version})
+Description: Naviserver Nsssl debugging symbols
+ This package includes the debugging symbols for Naviserver-nsssl
