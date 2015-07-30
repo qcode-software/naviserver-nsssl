@@ -2,7 +2,7 @@ naviserver-nsssl (4.99.9~20150730-1) wheezy; urgency=low
 
   * Import from upstream (binary support for -body in ns_ssl)
 
- --  Qcode Software Ltd <hackers@qcode.co.uk>  Thu, 30 Jul 2015 12:58:14 +0100
+ -- Qcode Software Ltd <hackers@qcode.co.uk>  Thu, 30 Jul 2015 12:58:14 +0100
 
 naviserver-nsssl (4.99.8-2) stable; urgency=low
 
