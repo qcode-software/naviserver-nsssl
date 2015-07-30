@@ -1,4 +1,4 @@
-naviserver-nsssl (4.99.9~20150730-1) stable; urgency=low
+naviserver-nsssl (4.99.9~20150730-1) wheezy; urgency=low
 
   * Import from upstream (binary support for -body in ns_ssl)
 
