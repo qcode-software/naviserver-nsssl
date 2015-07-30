@@ -42,6 +42,8 @@
 
 #define NSSSL_VERSION  "0.8"
 
+NS_EXTERN bool NsTclObjIsByteArray(const Tcl_Obj *objPtr);
+
 typedef struct {
     SSL_CTX     *ctx;
     Ns_Mutex     lock;
@@ -79,7 +81,7 @@ static int SSLPassword(char *buf, int num, int rwflag, void *userdata);
 static void SSLLock(int mode, int n, const char *file, int line);
 static unsigned long SSLThreadId(void);
 static int HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr,
-			Tcl_Obj *bodyPtr, char *cert, char *caFile, char *caPath, int verify,
+			Tcl_Obj *bodyPtr, char *cert, char *caFile, char *caPath, int verify, bool keep_host_header,
 			Https **httpsPtrPtr);
 static void HttpsClose(Https *httpsPtr);
 static void HttpsCancel(Https *httpsPtr);
@@ -751,6 +753,7 @@ SSLObjCmd(ClientData arg, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
         char *cert = NULL;
         char buf[32], *url = NULL, *method = "GET", *caFile = NULL, *caPath = NULL;
         Tcl_Obj *bodyPtr = NULL;
+	bool keep_host_header = NS_FALSE;
 
         Ns_ObjvSpec opts[] = {
             {"-timeout",  Ns_ObjvTime,    &timeoutPtr,  NULL},
@@ -761,6 +764,7 @@ SSLObjCmd(ClientData arg, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
             {"-capath",   Ns_ObjvString,  &caPath,      NULL},
             {"-body",     Ns_ObjvObj,     &bodyPtr,     NULL},
             {"-verify",   Ns_ObjvBool,    &verify,      NULL},
+	    {"-keep_host_header", Ns_ObjvBool, &keep_host_header, INT2PTR(NS_TRUE)},
             {NULL, NULL,  NULL, NULL}
         };
         Ns_ObjvSpec args[] = {
@@ -771,7 +775,7 @@ SSLObjCmd(ClientData arg, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
             return TCL_ERROR;
         }
 	if (HttpsConnect(interp, method, url, hdrPtr, bodyPtr, 
-			 cert, caFile, caPath, verify,
+			 cert, caFile, caPath, verify, keep_host_header,
 			 &httpsPtr) != TCL_OK) {
 	    return TCL_ERROR;
 	}
@@ -833,7 +837,7 @@ SSLObjCmd(ClientData arg, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
             {"-status",     Ns_ObjvObj,  &statusVarPtr,  NULL},
 	    {"-file",       Ns_ObjvObj,  &fileVarPtr,    NULL},
 	    {"-spoolsize",  Ns_ObjvInt,  &spoolLimit,    NULL},
-	    {"-decompress", Ns_ObjvBool, &decompress,    (void *)NS_TRUE},
+	    {"-decompress", Ns_ObjvBool, &decompress,    INT2PTR(NS_TRUE)},
             {NULL, NULL,  NULL, NULL}
         };
         Ns_ObjvSpec args[] = {
@@ -1028,7 +1032,7 @@ HttpsGet(Tcl_Interp *interp, char *id)
 
 int
 HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Obj *bodyPtr, 
-	     char *cert, char *caFile, char *caPath, int verify,
+	     char *cert, char *caFile, char *caPath, int verify, bool keep_host_header,
 	     Https **httpsPtrPtr)
 {
     NS_SOCKET    sock;
@@ -1045,12 +1049,24 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 	Tcl_AppendResult(interp, "invalid url: ", url, NULL);
 	return TCL_ERROR;
     }
+
+    /* 
+     * If host_keep_header set then Host header must be present.
+     */
+
+    if (keep_host_header == NS_TRUE) {
+        if ( hdrPtr == NULL || Ns_SetIFind(hdrPtr, "Host") == -1 ) {
+	    Tcl_AppendResult(interp, "keep_host_header specified but no Host header given", NULL);
+	    return TCL_ERROR;
+        }
+    }
+
     /*
      * Make a non-const copy of url, where we can replace the item separating
      * characters with '\0' characters.
      */
     url2 = ns_strdup(url);
-    
+
     host = url2 + 8;
     file = strchr(host, '/');
     if (file != NULL) {
@@ -1163,7 +1179,9 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 	/*
 	 * Remove the header fields, we are providing
 	 */
-	Ns_SetIDeleteKey(hdrPtr, "Host");
+        if (keep_host_header == NS_FALSE) {
+	    Ns_SetIDeleteKey(hdrPtr, "Host");
+        }
 	Ns_SetIDeleteKey(hdrPtr, "Connection");
 	Ns_SetIDeleteKey(hdrPtr, "Content-Length");
 
@@ -1190,17 +1208,27 @@ HttpsConnect(Tcl_Interp *interp, char *method, char *url, Ns_Set *hdrPtr, Tcl_Ob
 			 Ns_InfoServerVersion());
     }
     
-    if (portString == NULL) {
-	Ns_DStringPrintf(&httpPtr->ds, "Host: %s\r\n", host);
-    } else {
-	Ns_DStringPrintf(&httpPtr->ds, "Host: %s:%d\r\n", host, portNr);
+    if (keep_host_header == NS_FALSE) {
+        if (portString == NULL) {
+	    Ns_DStringPrintf(&httpPtr->ds, "Host: %s\r\n", host);
+        } else {
+	    Ns_DStringPrintf(&httpPtr->ds, "Host: %s:%d\r\n", host, portNr);
+        }
     }
 
     if (bodyPtr != NULL) {
-        int len = 0;
-	const char *body = Tcl_GetStringFromObj(bodyPtr, &len);
-	Ns_DStringPrintf(&httpPtr->ds, "Content-Length: %d\r\n\r\n", len);
-        Tcl_DStringAppend(&httpPtr->ds, body, len);
+        int length = 0;
+	const char *body;
+        bool binary = NsTclObjIsByteArray(bodyPtr);
+
+	if (binary == NS_TRUE) {
+	    body = (void *)Tcl_GetByteArrayFromObj(bodyPtr, &length);
+        } else {
+            body = Tcl_GetStringFromObj(bodyPtr, &length);
+        }
+	Ns_DStringPrintf(&httpPtr->ds, "Content-Length: %d\r\n\r\n", length);
+        Tcl_DStringAppend(&httpPtr->ds, body, length);
+        
     } else {
         Tcl_DStringAppend(&httpPtr->ds, "\r\n", 2);
     }
